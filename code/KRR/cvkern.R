@@ -1,32 +1,30 @@
-# cvkern.R
+
 # Kernel ridge regression with Gaussian kernel and cross-validated hyperparameter search.
 # Rewritten to use kernlab::gausspr / kernlab::ksvm instead of the defunct KRLS2 package.
-#
-# kernlab is on CRAN and actively maintained. Install via: install.packages("kernlab")
-#
-# The Gaussian kernel in kernlab is parameterised by `sigma` (= 1 / (2 * b^2) in some
-# conventions). Here we keep the paper's convention and search over bandwidth b, converting
-# internally: sigma_kernlab = 1 / b.
 
-#' Kernel ridge regression (Gaussian kernel) with cross-validated hyperparameters
-#'
-#' Fits KRR using \code{kernlab::gausspr} over a grid of kernel bandwidth values \code{b}
-#' and ridge penalty values \code{lambda}.  Hyperparameters are selected by k-fold
-#' cross-validation on (weighted) MSE.
-#'
+# kernlab is on CRAN and actively maintained. Install via: install.packages("kernlab")
+
+# The Gaussian kernel in kernlab is parameterised by `sigma` (= 1 / (2 * b^2) in some conventions). 
+# Here we keep the paper's convention and search over bandwidth b, converting internally: sigma_kernlab = 1 / b.
+
+# Kernel ridge regression (Gaussian kernel) with cross-validated hyperparameters
+
+#' Fits KRR using \code{kernlab::gausspr} over a grid of kernel bandwidth values \code{b} and ridge penalty values \code{lambda}.  
+#' Hyperparameters are selected by k-fold cross-validation on (weighted) MSE.
+
 #' @param x       Numeric feature matrix (n x p).
 #' @param y       Numeric response vector (length n).
 #' @param weights Optional numeric weight vector (length n). If NULL, OLS weighting.
 #' @param k_folds Number of CV folds.
 #' @param b_range Grid of Gaussian kernel bandwidth values (search over these).
 #' @param lambda_range Grid of ridge penalty values (search over these).
-#'
+
 #' @return A list with elements:
 #'   \item{b}{Best bandwidth.}
 #'   \item{lambda}{Best ridge penalty.}
 #'   \item{fit}{Cross-validated in-sample predictions (length n).}
 #'   \item{model}{Final model object (kernlab ksvm) fitted on all data with best params.}
-#'
+
 #' @examples
 #' \dontrun{
 #' n <- 200; p <- 5
@@ -38,6 +36,8 @@
 #'
 #' @importFrom kernlab ksvm predict
 #' @export
+
+
 cv_klrs <- function(x,
                     y,
                     weights    = NULL,
