@@ -141,7 +141,7 @@ cat("Mean propensity, high SES (>=8):",
 rlasso_fit = rlasso(x, w, y)
 rlasso_est = predict(rlasso_fit, x)
 
-rboost_fit = rboost(x, w, y)
+rboost_fit = rboost(x, w, y, verbose = T)
 rboost_est = predict(rboost_fit, x)
 
 cat("\n--- Learner estimates vs true tau ---\n")
@@ -151,3 +151,175 @@ cat("rboost mean estimate:", round(mean(rboost_est), 3), "\n")
 
 cat("\nTrue tau MSE (rlasso):", round(mean((rlasso_est - tau_x)^2), 3), "\n")
 cat("True tau MSE (rboost):", round(mean((rboost_est - tau_x)^2), 3), "\n")
+
+# Collect estimates in a named list for clean looping
+learners = list(
+  rlasso = rlasso_est,
+  rboost = rboost_est
+)
+
+# ---------------------------------------------------------
+# MEASURE 1: Normalised MSE
+# Raw MSE scaled by variance of true tau
+# Interpretation:
+#   < 0.25 = excellent  (capturing > 75% of true heterogeneity)
+#   0.25 to 0.75 = acceptable
+#   > 1.00 = no better than predicting the mean effect for everyone
+# ---------------------------------------------------------
+
+cat("===========================================\n")
+cat("MEASURE 1: Normalised MSE\n")
+cat("===========================================\n")
+
+tau_variance = var(tau_x)
+cat("Variance of true tau(X):", round(tau_variance, 4), "\n")
+cat("Raw MSE threshold for 'no better than mean':", 
+    round(tau_variance, 4), "\n\n")
+
+for (name in names(learners)) {
+  est       = learners[[name]]
+  raw_mse   = mean((est - tau_x)^2)
+  norm_mse  = raw_mse / tau_variance
+  
+  # Classify performance
+  quality = ifelse(norm_mse < 0.25, "EXCELLENT",
+            ifelse(norm_mse < 0.75, "ACCEPTABLE",
+            ifelse(norm_mse < 1.00, "POOR",
+                                    "WORSE THAN MEAN")))
+  
+  cat("Learner:", name, "\n")
+  cat("  Raw MSE:        ", round(raw_mse, 4), "\n")
+  cat("  Normalised MSE: ", round(norm_mse, 4), "\n")
+  cat("  Performance:    ", quality, "\n\n")
+}
+
+# Baseline comparison: what if we just predict the mean tau for everyone?
+mean_pred_mse = mean((mean(tau_x) - tau_x)^2)
+cat("Baseline (constant mean prediction) MSE:", 
+    round(mean_pred_mse, 4), "\n")
+cat("Note: any learner with MSE above this is worse than useless\n\n")
+
+# ---------------------------------------------------------
+# MEASURE 2: Rank Correlation
+# Spearman correlation between estimated and true tau
+# Interpretation:
+#   > 0.80 = reliable ranking of individuals
+#   0.50 to 0.80 = moderate signal, noisy ranking
+#   0.30 to 0.50 = weak signal, mostly unreliable
+#   < 0.30 = essentially random ranking
+# ---------------------------------------------------------
+
+cat("===========================================\n")
+cat("MEASURE 2: Rank Correlation\n")
+cat("===========================================\n")
+
+for (name in names(learners)) {
+  est       = learners[name]
+  rank_corr = cor(est, tau_x, method = "spearman")
+  
+  quality = ifelse(rank_corr > 0.80, "RELIABLE RANKING",
+            ifelse(rank_corr > 0.50, "MODERATE SIGNAL",
+            ifelse(rank_corr > 0.30, "WEAK SIGNAL",
+                                     "ESSENTIALLY RANDOM")))
+  
+  cat("Learner:", name, "\n")
+  cat("  Spearman correlation:", round(rank_corr, 4), "\n")
+  cat("  Ranking quality:     ", quality, "\n\n")
+}
+
+# ---------------------------------------------------------
+# MEASURE 3: Subgroup Recovery
+# Split into low / medium / high cardiovascular risk
+# Check whether learner correctly orders the subgroup estimates
+# Interpretation:
+#   Estimated subgroup difference should be close to true difference
+#   If true gap between low and high risk is 4 years,
+#   learner should estimate at least 3 years (75% recovery)
+# ---------------------------------------------------------
+
+cat("===========================================\n")
+cat("MEASURE 3: Subgroup Recovery\n")
+cat("===========================================\n")
+
+# Define subgroups by cardiovascular risk terciles
+low_risk  = cardio_risk < quantile(cardio_risk, 1/3)
+mid_risk  = cardio_risk >= quantile(cardio_risk, 1/3) & 
+            cardio_risk < quantile(cardio_risk, 2/3)
+high_risk = cardio_risk >= quantile(cardio_risk, 2/3)
+
+# True subgroup effects
+true_low  = mean(tau_x[low_risk])
+true_mid  = mean(tau_x[mid_risk])
+true_high = mean(tau_x[high_risk])
+true_gap  = true_high - true_low   # negative: high risk harmed more
+
+cat("True treatment effects by subgroup:\n")
+cat("  Low cardio risk:  ", round(true_low, 3), "\n")
+cat("  Mid cardio risk:  ", round(true_mid, 3), "\n")
+cat("  High cardio risk: ", round(true_high, 3), "\n")
+cat("  True gap (high - low):", round(true_gap, 3), "\n\n")
+
+for (name in names(learners)) {
+  est = learners[[name]]
+  
+  est_low  = mean(est[low_risk])
+  est_mid  = mean(est[mid_risk])
+  est_high = mean(est[high_risk])
+  est_gap  = est_high - est_low
+  
+  # Recovery ratio: how much of the true gap is captured
+  recovery = est_gap / true_gap
+  
+  # Ordering check: does learner correctly rank subgroups?
+  correct_order = (est_low > est_mid) & (est_mid > est_high)
+  
+  quality = ifelse(recovery > 0.75, "STRONG RECOVERY",
+            ifelse(recovery > 0.50, "MODERATE RECOVERY",
+            ifelse(recovery > 0.25, "WEAK RECOVERY",
+                                    "MISSED HETEROGENEITY")))
+  
+  cat("Learner:", name, "\n")
+  cat("  Estimated low risk:   ", round(est_low, 3), "\n")
+  cat("  Estimated mid risk:   ", round(est_mid, 3), "\n")
+  cat("  Estimated high risk:  ", round(est_high, 3), "\n")
+  cat("  Estimated gap:        ", round(est_gap, 3), "\n")
+  cat("  Recovery ratio:       ", round(recovery, 3), "\n")
+  cat("  Correct ordering:     ", correct_order, "\n")
+  cat("  Subgroup quality:     ", quality, "\n\n")
+}
+
+# ---------------------------------------------------------
+# SUMMARY TABLE
+# ---------------------------------------------------------
+
+cat("===========================================\n")
+cat("SUMMARY TABLE\n")
+cat("===========================================\n")
+
+summary_table = data.frame(
+  Learner     = character(),
+  Raw_MSE     = numeric(),
+  Norm_MSE    = numeric(),
+  Rank_Corr   = numeric(),
+  Recovery    = numeric(),
+  row.names   = NULL
+)
+
+for (name in names(learners)) {
+  est      = learners[[name]]
+  raw_mse  = mean((est - tau_x)^2)
+  norm_mse = raw_mse / tau_variance
+  rank_corr= cor(est, tau_x, method = "spearman")
+  est_gap  = mean(est[high_risk]) - mean(est[low_risk])
+  recovery = est_gap / true_gap
+  
+  summary_table = rbind(summary_table, data.frame(
+    Learner   = name,
+    Raw_MSE   = round(raw_mse, 3),
+    Norm_MSE  = round(norm_mse, 3),
+    Rank_Corr = round(rank_corr, 3),
+    Recovery  = round(recovery, 3)
+  ))
+}
+
+print(summary_table, row.names = FALSE)
