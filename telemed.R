@@ -52,7 +52,7 @@ x1_bp       = 110 + 80 * pnorm(z[,1])
 # X2: travel time — 5 to 120 minutes
 # Right-skewed distribution reflects most patients living fairly close
 # with a tail of genuinely remote patients
-x2_travel   = 5 + 115 * pnorm(z[,2])
+x2_travel = 20 + 60 * pnorm(z[,2])
 
 # X3: prior digital health interactions — 0 to 20
 # Rounded to integer as this is a count
@@ -102,7 +102,7 @@ x4_s = scale(x4_comorbid)
 x5_s = scale(x5_age)
 
 log_odds_w = -0.5 +
-  1 * x2_s +    # travel time dominant positive driver
+  1.5 * x2_s +    # travel time dominant positive driver
   0.5 * x1_s +    # poorly controlled BP moderate positive
   -0.4 * x5_s      # older patients slightly less likely enrolled
 
@@ -265,7 +265,7 @@ rlasso_fit = rlasso(x, w, y)
 rlasso_est = predict(rlasso_fit, x)
 
 cat("Fitting rboost...\n")
-rboost_fit = rboost(x, w, y)
+rboost_fit = rboost(x, w, y, verbose = T)
 rboost_est = predict(rboost_fit, x)
 
 learners = list(rlasso = rlasso_est,
