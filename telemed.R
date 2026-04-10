@@ -8,6 +8,7 @@
 
 library(MASS)       # for mvrnorm — correlated covariate generation
 library(rlearner)   # for rlasso and rboost
+library(KRLS2)
 
 set.seed(42)
 n = 200
@@ -265,11 +266,19 @@ rlasso_fit = rlasso(x, w, y)
 rlasso_est = predict(rlasso_fit, x)
 
 cat("Fitting rboost...\n")
-rboost_fit = rboost(x, w, y, verbose = T)
+rboost_fit = rboost(x, w, y, verbose = T, num_search_rounds = 3)
 rboost_est = predict(rboost_fit, x)
 
+cat("Fitting rkern...\n")
+# Reduced grid for exploratory use
+rkern_fit = rkern(x, w, y,
+                  b_range      = 10^(seq(-1, 2, 1)),   # 4 values instead of 13
+                  lambda_range = 10^(seq(-1, 2, 1)))   # 4 values instead of 13
+rkern_est = predict(rkern_fit, x)
+
 learners = list(rlasso = rlasso_est,
-                rboost = rboost_est)
+                rboost = rboost_est,
+                rkern = rkern_est)
 
 # ============================================================
 # SECTION 8: EVALUATION
@@ -420,3 +429,214 @@ legend("topleft",
        cex    = 0.5)
 
 par(mfrow = c(1, 1))
+
+# ============================================================
+# ADDITIONAL BASELINES
+# Baseline 1: Constant zero predictor
+# Baseline 4: OLS with treatment-covariate interactions
+# ============================================================
+
+# --- Baseline 1: Constant zero predictor ---
+# Predicts tau = 0 for everyone
+# Represents a researcher who concludes no treatment effect exists
+# MSE of this predictor equals the variance of tau by definition
+zero_pred = rep(0, n)
+
+# --- Baseline 4: OLS with interactions ---
+# Regress Y on all covariates, W, and W x covariate interactions
+# This produces a heterogeneous treatment effect estimate
+# that is linear in each covariate separately
+# tau estimate for each individual is extracted as:
+# tau_hat(X) = coef(W) + coef(W:X1)*X1 + coef(W:X2)*X2 + ...
+
+# Build interaction design matrix
+x_df = as.data.frame(x)
+colnames(x_df) = c("bp", "travel", "digital", "comorbid", "age")
+
+# Create interaction terms between W and each covariate
+ols_data = data.frame(
+  y       = y,
+  w       = w,
+  x_df,
+  w_bp      = w * x_df$bp,
+  w_travel  = w * x_df$travel,
+  w_digital = w * x_df$digital,
+  w_comorbid= w * x_df$comorbid,
+  w_age     = w * x_df$age
+)
+
+ols_fit = lm(y ~ bp + travel + digital + comorbid + age +
+               w + w_bp + w_travel + w_digital + 
+               w_comorbid + w_age,
+             data = ols_data)
+
+# Extract implied treatment effect for each individual
+# tau_hat(Xi) = coef[W] + coef[W:bp]*bp_i + coef[W:travel]*travel_i + ...
+coef_w          = coef(ols_fit)["w"]
+coef_w_bp       = coef(ols_fit)["w_bp"]
+coef_w_travel   = coef(ols_fit)["w_travel"]
+coef_w_digital  = coef(ols_fit)["w_digital"]
+coef_w_comorbid = coef(ols_fit)["w_comorbid"]
+coef_w_age      = coef(ols_fit)["w_age"]
+
+ols_tau_est = coef_w +
+  coef_w_bp       * x_df$bp +
+  coef_w_travel   * x_df$travel +
+  coef_w_digital  * x_df$digital +
+  coef_w_comorbid * x_df$comorbid +
+  coef_w_age      * x_df$age
+
+# Add baselines to learner list
+learners_all = list(
+  rlasso     = rlasso_est,
+  rboost     = rboost_est,
+  zero_pred  = zero_pred,
+  ols_inter  = as.numeric(ols_tau_est)
+)
+
+# ============================================================
+# EVALUATION ACROSS ALL LEARNERS AND BASELINES
+# ============================================================
+
+cat("===========================================\n")
+cat("MEASURE 1: NORMALISED MSE\n")
+cat("===========================================\n")
+cat("Variance of true tau(X):", round(tau_variance, 4), "\n")
+cat("Note: normalised MSE = 1.0 means no better than zero predictor\n\n")
+
+for (name in names(learners_all)) {
+  est      = learners_all[[name]]
+  raw_mse  = mean((est - tau_x)^2)
+  norm_mse = raw_mse / tau_variance
+  
+  quality  = ifelse(norm_mse < 0.25, "EXCELLENT",
+                    ifelse(norm_mse < 0.75, "ACCEPTABLE",
+                           ifelse(norm_mse < 1.00, "POOR",
+                                  "WORSE THAN MEAN")))
+  
+  cat("Learner:", name, "\n")
+  cat("  Raw MSE:        ", round(raw_mse,  4), "\n")
+  cat("  Normalised MSE: ", round(norm_mse, 4), "\n")
+  cat("  Performance:    ", quality, "\n\n")
+}
+
+# Sanity check: zero predictor normalised MSE should equal exactly 1.0
+# because MSE of zero predictor = E[tau^2] = var(tau) when mean(tau) ~ 0
+cat("Sanity check — zero predictor normalised MSE should be ~1.0:",
+    round(mean((zero_pred - tau_x)^2) / tau_variance, 4), "\n\n")
+
+cat("===========================================\n")
+cat("MEASURE 2: RANK CORRELATION\n")
+cat("===========================================\n")
+cat("Note: zero predictor has undefined rank correlation\n")
+cat("      (all predictions identical — no ranking information)\n\n")
+
+for (name in names(learners_all)) {
+  est = learners_all[[name]]
+  
+  # Zero predictor has no variation so rank correlation is undefined
+  if (sd(est) < 1e-10) {
+    cat("Learner:", name, "\n")
+    cat("  Spearman correlation: NA (all predictions identical)\n")
+    cat("  Ranking quality:      UNDEFINED — no heterogeneity captured\n\n")
+    next
+  }
+  
+  rank_corr = cor(est, tau_x, method = "spearman")
+  quality   = ifelse(rank_corr > 0.80, "RELIABLE RANKING",
+                     ifelse(rank_corr > 0.50, "MODERATE SIGNAL",
+                            ifelse(rank_corr > 0.30, "WEAK SIGNAL",
+                                   "ESSENTIALLY RANDOM")))
+  
+  cat("Learner:", name, "\n")
+  cat("  Spearman correlation:", round(rank_corr, 4), "\n")
+  cat("  Ranking quality:     ", quality, "\n\n")
+}
+
+cat("===========================================\n")
+cat("MEASURE 3: SUBGROUP RECOVERY\n")
+cat("===========================================\n")
+
+true_sg1 = mean(tau_x[sg1])
+true_sg2 = mean(tau_x[sg2])
+true_sg3 = mean(tau_x[sg3])
+
+cat("True mean tau by subgroup:\n")
+cat("  SG1 (young/remote/digital):", round(true_sg1, 3), "\n")
+cat("  SG2 (severe/complex):      ", round(true_sg2, 3), "\n")
+cat("  SG3 (elderly/low digital): ", round(true_sg3, 3), "\n\n")
+
+for (name in names(learners_all)) {
+  est = learners_all[[name]]
+  
+  est_sg1 = mean(est[sg1])
+  est_sg2 = mean(est[sg2])
+  est_sg3 = mean(est[sg3])
+  
+  rec_sg1 = est_sg1 / true_sg1
+  rec_sg2 = est_sg2 / true_sg2
+  rec_sg3 = ifelse(abs(true_sg3) < 0.1, NA, est_sg3 / true_sg3)
+  
+  correct_sign_sg1 = sign(est_sg1) == sign(true_sg1)
+  correct_sign_sg2 = sign(est_sg2) == sign(true_sg2)
+  
+  cat("Learner:", name, "\n")
+  cat("  SG1 estimated:", round(est_sg1, 3),
+      "| true:", round(true_sg1, 3),
+      "| recovery:", round(rec_sg1, 3),
+      "| correct sign:", correct_sign_sg1, "\n")
+  cat("  SG2 estimated:", round(est_sg2, 3),
+      "| true:", round(true_sg2, 3),
+      "| recovery:", round(rec_sg2, 3),
+      "| correct sign:", correct_sign_sg2, "\n")
+  cat("  SG3 estimated:", round(est_sg3, 3),
+      "| true:", round(true_sg3, 3),
+      "| recovery:", ifelse(is.na(rec_sg3), "NA (near zero)",
+                            as.character(round(rec_sg3, 3))), "\n\n")
+}
+
+# ============================================================
+# SUMMARY TABLE — all learners and baselines side by side
+# ============================================================
+
+cat("===========================================\n")
+cat("FULL SUMMARY TABLE\n")
+cat("===========================================\n")
+
+summary_rows = list()
+
+for (name in names(learners_all)) {
+  est      = learners_all[[name]]
+  raw_mse  = mean((est - tau_x)^2)
+  norm_mse = raw_mse / tau_variance
+  
+  rank_corr = ifelse(sd(est) < 1e-10, NA,
+                     cor(est, tau_x, method = "spearman"))
+  
+  est_sg1  = mean(est[sg1])
+  est_sg2  = mean(est[sg2])
+  rec_sg1  = round(est_sg1 / true_sg1, 3)
+  rec_sg2  = round(est_sg2 / true_sg2, 3)
+  
+  sign_sg1 = sign(est_sg1) == sign(true_sg1)
+  sign_sg2 = sign(est_sg2) == sign(true_sg2)
+  
+  summary_rows[[name]] = data.frame(
+    Learner    = name,
+    Norm_MSE   = round(norm_mse, 3),
+    Rank_Corr  = ifelse(is.na(rank_corr), "NA", round(rank_corr, 3)),
+    Rec_SG1    = rec_sg1,
+    Rec_SG2    = rec_sg2,
+    Sign_SG1   = sign_sg1,
+    Sign_SG2   = sign_sg2
+  )
+}
+
+summary_table = do.call(rbind, summary_rows)
+print(summary_table, row.names = FALSE)
+
+cat("\nInterpretation guide:\n")
+cat("  Norm_MSE  < 1.0 means better than zero predictor\n")
+cat("  Rank_Corr > 0.5 means meaningful individual ranking\n")
+cat("  Rec_SG1/2 close to 1.0 means correct subgroup magnitude\n")
+cat("  Sign_SG1/2 = TRUE means correct direction of effect\n")
