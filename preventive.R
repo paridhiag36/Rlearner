@@ -8,8 +8,9 @@
 
 library(MASS)      # for mvrnorm — correlated covariate generation
 library(rlearner)  # for rlasso and rboost
+library(KRLS2)
 
-set.seed(123)
+set.seed(1)
 n = 200
 
 # ============================================================
@@ -19,7 +20,7 @@ n = 200
 # X2: GP visits in past 24 months (count)  — range 0 to 12
 # X3: medication adherence ratio           — range 0 to 1 (continuous)
 # X4: travel time to clinic (minutes)      — range 5 to 60
-# X5: area deprivation index               — standardised, higher = more deprived
+# X5: area deprivation index               — standardised, higher = more deprived in US
 #
 # Correlation structure:
 #   age <-> past GP visits:       +0.35  older patients have more established care
@@ -100,11 +101,12 @@ x4_s = scale(x4_travel)
 x5_s = scale(x5_deprivation)
 
 # Propensity: older patients and LESS adherent patients more likely targeted
-# Less adherent = lower x3_s = negative x3_s contribution = positive propensity
-# So coefficient on x3_s is negative — lower adherence raises propensity
 log_odds_w = 0.0 +
-             0.6 * x1_s +    # older patients more likely to receive reminder
-            -0.4 * x3_s      # less adherent patients more likely targeted
+  0.60 * as.numeric(x1_s) +   # age — dominant driver
+  -0.40 * as.numeric(x3_s) +   # adherence — less adherent targeted
+  0.20 * as.numeric(x2_s) +   # past visits — engaged patients
+  -0.15 * as.numeric(x5_s) +   # deprivation — mild negative
+  -0.10 * as.numeric(x4_s)     # travel — mild negative
 
 propensity = plogis(log_odds_w)
 
@@ -162,11 +164,11 @@ cat("Range:", round(min(tau_x), 4), "to", round(max(tau_x), 4), "\n")
 # ============================================================
 
 b_x = 3.0 +
-      0.30 * as.numeric(x2_s) +   # past visits strongest predictor
-      0.20 * as.numeric(x3_s) +   # adherent patients visit more
-     -0.15 * as.numeric(x4_s) +   # distance reduces attendance
-     -0.15 * as.numeric(x5_s) +   # deprivation reduces attendance
-      0.10 * as.numeric(x1_s)     # age modest positive effect
+  0.15 * as.numeric(x2_s) +   # halved from 0.30
+  0.10 * as.numeric(x3_s) +   # halved from 0.20
+  -0.08 * as.numeric(x4_s) +   # halved from 0.15
+  -0.08 * as.numeric(x5_s) +   # halved from 0.15
+  0.05 * as.numeric(x1_s)     # halved from 0.10
 
 cat("\n=== BASELINE OUTCOME b(X) SUMMARY ===\n")
 cat("Mean b(X):", round(mean(b_x), 3), "visits\n")

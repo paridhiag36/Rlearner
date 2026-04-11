@@ -9,6 +9,11 @@
 library(MASS)       # for mvrnorm — correlated covariate generation
 library(rlearner)   # for rlasso and rboost
 library(KRLS2)
+library(future)
+library(furrr)
+
+# Use all available cores minus one to keep machine responsive
+#plan(multisession, workers = parallel::detectCores() - 1)
 
 set.seed(42)
 n = 200
@@ -260,13 +265,14 @@ cat("SG3 mean true tau:", round(mean(tau_x[sg3]), 3),
 # SECTION 7: FIT LEARNERS
 # ============================================================
 
+start_time = Sys.time()
 cat("\n=== FITTING LEARNERS ===\n")
 cat("Fitting rlasso...\n")
 rlasso_fit = rlasso(x, w, y)
 rlasso_est = predict(rlasso_fit, x)
 
 cat("Fitting rboost...\n")
-rboost_fit = rboost(x, w, y, verbose = T)
+rboost_fit = rboost(x, w, y, num_search_rounds = 5, k_folds = 5, ntrees_max = 300, early_stopping_rounds = 5, verbose = T)
 rboost_est = predict(rboost_fit, x)
 
 cat("Fitting rkern...\n")
@@ -274,9 +280,57 @@ cat("Fitting rkern...\n")
 rkern_fit = rkern(x, w, y)
 rkern_est = predict(rkern_fit, x)
 
+cat("Fitting slasso...\n")
+slasso_fit = slasso(x, w, y)
+slasso_est = predict(slasso_fit, x)
+
+cat("Fitting sboost...\n")
+sboost_fit = sboost(x, w, y, num_search_rounds = 5, k_folds = 5, ntrees_max = 300, early_stopping_rounds = 5, verbose = T)
+sboost_est = predict(sboost_fit, x)
+
+cat("Fitting skern...\n")
+# Reduced grid for exploratory use
+skern_fit = skern(x, w, y)
+skern_est = predict(skern_fit, x)
+
+cat("Fitting tlasso...\n")
+tlasso_fit = tlasso(x, w, y)
+tlasso_est = predict(tlasso_fit, x)
+
+cat("Fitting tboost...\n")
+tboost_fit = tboost(x, w, y, ntrees_max = 300, early_stopping_rounds = 5, verbose = T)
+tboost_est = predict(tboost_fit, x)
+
+cat("Fitting tkern...\n")
+# Reduced grid for exploratory use
+tkern_fit = tkern(x, w, y)
+tkern_est = predict(tkern_fit, x)
+
+cat("Fitting xlasso...\n")
+xlasso_fit = xlasso(x, w, y)
+xlasso_est = predict(xlasso_fit, x)
+
+cat("Fitting xboost...\n")
+xboost_fit = xboost(x, w, y, ntrees_max = 300, early_stopping_rounds = 5, verbose = T)
+xboost_est = predict(xboost_fit, x)
+
+cat("Fitting xkern...\n")
+# Reduced grid for exploratory use
+xkern_fit = xkern(x, w, y)
+xkern_est = predict(xkern_fit, x)
+
 learners = list(rlasso = rlasso_est,
                 rboost = rboost_est,
-                rkern = rkern_est)
+                rkern = rkern_est,
+                slasso = slasso_est,
+                sboost = sboost_est,
+                skern = skern_est,
+                tlasso = tlasso_est,
+                tboost = tboost_est,
+                tkern = tkern_est,
+                xlasso = xlasso_est,
+                xboost = xboost_est,
+                xkern = xkern_est)
 
 # ============================================================
 # SECTION 8: EVALUATION
@@ -321,6 +375,8 @@ for (name in names(learners)) {
   cat("  Spearman correlation:", round(rank_corr, 4), "\n")
   cat("  Ranking quality:     ", quality, "\n\n")
 }
+end_time = Sys.time()
+end_time-start_time
 
 cat("\n=== MEASURE 3: SUBGROUP RECOVERY ===\n")
 
