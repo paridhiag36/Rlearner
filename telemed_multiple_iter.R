@@ -31,6 +31,15 @@ boost_args = list(
   verbose               = FALSE
 )
 
+boost_args_others = list(
+  num_search_rounds     = 5,
+  k_folds_mu1               = 5,
+  k_folds_mu0               = 5,
+  ntrees_max            = 300,
+  early_stopping_rounds = 5,
+  verbose               = FALSE
+)
+
 # Parallelisation — use all cores minus one
 n_workers = max(1, parallel::detectCores() - 1)
 plan(multisession, workers = n_workers)
@@ -176,13 +185,13 @@ run_one_iteration = function(iter_seed, n, n_train, n_test,
   
   tlasso_est = safe_fit(tlasso, predict, x_train, w_train, y_train)
   tboost_est = safe_fit(
-    function(...) do.call(tboost, c(list(...), boost_args)),
+    function(...) do.call(tboost, c(list(...), boost_args_others)),
     predict, x_train, w_train, y_train)
   tkern_est  = safe_fit(tkern,  predict, x_train, w_train, y_train)
   
   xlasso_est = safe_fit(xlasso, predict, x_train, w_train, y_train)
   xboost_est = safe_fit(
-    function(...) do.call(xboost, c(list(...), boost_args)),
+    function(...) do.call(xboost, c(list(...), boost_args_others)),
     predict, x_train, w_train, y_train)
   xkern_est  = safe_fit(xkern,  predict, x_train, w_train, y_train)
   
@@ -373,7 +382,7 @@ summarise_learner = function(lname) {
     list(
       mean  = round(m, 4),
       sd    = round(s, 4),
-      ci_lo = round(m - 1.96*se, 4),
+      ci_lo = max(0, round(m - 1.96*se, 4)),
       ci_hi = round(m + 1.96*se, 4)
     )
   }
