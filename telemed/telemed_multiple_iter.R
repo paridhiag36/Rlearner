@@ -16,7 +16,7 @@ library(furrr)
 # CONFIGURATION
 # ============================================================
 
-n_iter   =200     # number of iterations
+n_iter   = 200     # number of iterations
 n        = 300     # total sample size per iteration
 n_train  = 200     # training set size
 n_test   = 100      # test set size
