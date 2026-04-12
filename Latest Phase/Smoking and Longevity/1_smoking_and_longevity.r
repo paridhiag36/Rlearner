@@ -5,10 +5,10 @@
 # Key feature: treatment is rare (target 5-10%) and always harmful
 # Confounding: low income and high stress increase both smoking and worse outcomes
 # ============================================================
-install.packages("devtools")
-library(devtools) 
-install_github("xnie/rlearner")
 
+# install.packages("devtools")
+# install_github("xnie/rlearner")
+library(devtools) 
 library(MASS)       # for mvrnorm — correlated covariate generation
 library(rlearner)   # for rlasso and rboost
 
