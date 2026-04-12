@@ -29,7 +29,7 @@ library(KRLS2)      # kernel ridge regression
 library(jsonlite)   # JSON export
 
 set.seed(42)
-n = 300   # increased from 200 to ensure interpretable results
+n = 1000   # increased from 200 to ensure interpretable results
 
 # ============================================================
 # SECTION 1: COVARIATE GENERATION
