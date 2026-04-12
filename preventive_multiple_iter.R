@@ -15,8 +15,8 @@ library(furrr)
 # CONFIGURATION
 # ============================================================
 
-n_iter   = 50     # number of independent iterations
-n        = 250    # total sample size per iteration
+n_iter   = 100     # number of independent iterations
+n        = 300    # total sample size per iteration
 n_train  = 200    # training set size
 n_test   = 100     # test set size
 sigma    = 1.0    # noise SD for outcome Y
