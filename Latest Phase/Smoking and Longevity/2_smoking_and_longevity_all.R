@@ -18,10 +18,10 @@ library(rlearner)
 library(KRLS2)
 
 # ============================================================
-# CONFIGURATION — change n here to run for 300, 500, or 1000
+# CONFIGURATION — change n here to run for 200, 300, or 500
 # ============================================================
 set.seed(42)
-n          = 300        # <<< CHANGE THIS: 300 / 500 / 1000
+n          = 500        # <<< CHANGE THIS: 300 / 500 
 train_frac = 0.80       # 80/20 train-test split — do not change
 
 ## Imp: keep working directory as setwd("~/DSE4231/Rlearner")
