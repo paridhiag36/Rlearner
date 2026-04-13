@@ -21,7 +21,7 @@ library(KRLS2)
 # CONFIGURATION — change n here to run for 300, 500, or 1000
 # ============================================================
 set.seed(42)
-n          = 500        # <<< CHANGE THIS: 300 / 500 / 1000
+n          = 300        # <<< CHANGE THIS: 300 / 500 / 1000
 train_frac = 0.80       # 80/20 train-test split — do not change
 
 ## Imp: keep working directory as setwd("~/DSE4231/Rlearner")
@@ -199,7 +199,7 @@ cat("Test: ", n_test,  "| Treated in test: ", sum(w_test), "(", round(mean(w_tes
 # SECTION 7: PRE-SPECIFIED CLINICAL SUBGROUPS ON TEST SET
 
 # SG1 — Biologically resilient (expect LOWEST tau)
-#   age < 55:   working-age, plastic lungs
+#   age < 60:   working-age, plastic lungs
 #   lung > 75:  good baseline function (upper third of 40-110)
 #   stress < 4: low chronic stress
 
@@ -220,16 +220,16 @@ x3_t = x_test[, "lung_baseline"]
 x4_t = x_test[, "health_literacy"]
 x5_t = x_test[, "stress"]
 
-sg1 = x1_t < 55 & x3_t > 75 & x5_t < 4
+sg1 = x1_t < 60 & x3_t > 75 & x5_t < 4
 sg2 = x1_t > 68 & x3_t < 58 & x5_t > 6
 sg3 = x2_t < 45 & x4_t < 6
 
 min_sg = 5
 cat("\n=== SUBGROUP SIZES (test set) ===\n")
-cat("SG1 (resilient — low harm):       ", sum(sg1), "\n") # 8 people
-cat("SG2 (vulnerable — high harm):     ", sum(sg2), "\n") # 5 people
-cat("SG3 (disadvantaged — confounding):", sum(sg3), "\n") # 9 people
-if (sum(sg1) < min_sg) warning("SG1 < 5 patients — consider relaxing: age<60, lung>70, stress<5")
+cat("SG1 (resilient — low harm):       ", sum(sg1), "\n") 
+cat("SG2 (vulnerable — high harm):     ", sum(sg2), "\n") 
+cat("SG3 (disadvantaged — confounding):", sum(sg3), "\n") 
+if (sum(sg1) < min_sg) warning("SG1 < 5 patients — consider relaxing: age<62, lung>70, stress<5")
 if (sum(sg2) < min_sg) warning("SG2 < 5 patients — consider relaxing: age>65, lung<62, stress>5")
 if (sum(sg3) < min_sg) warning("SG3 < 5 patients — consider relaxing: income<55, literacy<8")
 
@@ -238,9 +238,7 @@ true_sg2 = mean(tau_test[sg2])
 true_sg3 = mean(tau_test[sg3])
 
 cat("True tau:  SG1=", round(true_sg1, 3), " SG2=", round(true_sg2, 3), " SG3=", round(true_sg3, 3), "\n")
-# True tau:  SG1= 0.5  SG2= 6.504  SG3= 4.332 
 cat("Ordering SG2 > SG3 > SG1:", (true_sg2 > true_sg3) & (true_sg3 > true_sg1), "\n")
-# TRUE for ordering
 
 # ============================================================
 # SECTION 8: FIT ALL LEARNERS
@@ -480,18 +478,23 @@ cat("Plot saved to:", file.path(output_dir, paste0("propensity_hist_n", n, ".png
 # ============================================================
 # Setup: 15 treated in training (5.8%) — extreme imbalance
 # True ATE=3.21 | tau SD=2.27
-# True tau: SG1=0.50 (resilient), SG2=6.50 (vulnerable), SG3=4.33 (confounding)
+# True tau: SG1=0.635 (resilient), SG2=6.50 (vulnerable), SG3=4.33 (confounding)
 # tkern and xkern FAILED (crashed — insufficient treated observations)
 
 # KEY FINDINGS:
-# Best learners: rkern (0.423) and xlasso (0.473) — both below 1.0, meaning they beat mean prediction despite only 15 treated in training. rkern achieves rank_corr=0.809 (reliable), xlasso=0.827 (reliable). Surprising that kern and lasso variants work at this n.
+# Best learners: rkern (0.423) and xlasso (0.473) — both below 1.0, beating mean prediction despite only 15 treated. rkern rank_corr=0.809, xlasso=0.827 (both reliable). However rkern produces negative SG1 estimates — good overall ranking but unreliable in the tails where data is sparse.
 # rlasso (0.732, rank=0.674): functional but weaker than rkern/xlasso. Correct ordering (SG2>SG3>SG1). No SG3 inflation — R-learner's propensity residualisation successfully avoids the confounding trap.
 # rboost (1.015): just above baseline, rank=-0.399 (anti-correlated). Collapsed near-constant — no heterogeneity recovered.
 # tboost (52.3): catastrophic failure. norm_mse=52, rank=-0.888, SG2 estimated at -14 (sign wrong). T-learner's treated arm model has 15 observations — boosting overfits completely.
 # sboost (9.49) and xboost (4.15): also badly degraded. Boosting-based methods universally fail at this imbalance level.
-# SG1 recovery: unreliable across all learners (true_sg1=0.50, near the pmax floor — small estimation errors inflate ratios).
+# SG1 recovery: unreliable across all learners (true_sg1=0.635, still near the pmax(0.5) floor despite relaxing age threshold to <60 — small estimation errors are amplified when dividing by a near-floor value. SG1 n=9 in test set.
+# Notable: rkern and skern produce NEGATIVE SG1 estimates (-0.143 and -8.086) which is clinically impossible — smoking always harms. This reflects the instability of these methods with only 15 treated training observations.
 # SG3: no learner inflates (sg3_inflated=FALSE for all non-failed). Confounding trap not triggered at n=300 — learners attenuate rather than inflate under extreme imbalance.
 # Propensity plot: bimodal distribution — most patients cluster near 0.01-0.03 (very unlikely to smoke), with a second cluster at the 0.20 cap for highest-risk patients. Treated patients (red) concentrated at the cap. Visually confirms extreme imbalance.
 
-# CONCLUSION: At n=300 (15 treated), kern and lasso variants show surprising resilience. Boosting fails consistently. Results motivate n=500 and n=1000 to test whether this pattern holds.
+# CONCLUSION: At n=300 (15 treated in training, 9 SG1 / 5 SG2 / 9 SG3 in test),
+#   kern and lasso variants show surprising resilience with rkern and xlasso both beating the mean baseline. Boosting fails universally. 
+#   SG1 recovery remains unreliable due to floor proximity. 
+#   No confounding inflation detected — all learners attenuate rather than inflate SG3 under extreme imbalance.
+#   Results motivate n=500 and n=1000 runs to test whether pattern holds.
 # ============================================================
