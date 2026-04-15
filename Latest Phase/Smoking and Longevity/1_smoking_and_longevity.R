@@ -251,13 +251,15 @@ rboost_est = predict(rboost_fit, x)
 # ============================================================
 
 tau_variance = var(tau_x)
-zero_pred    = rep(mean(tau_x), n)   # baseline: predict mean tau for everyone
+
+zero_pred  = rep(0, n)                                        # floor: assumes no treatment effect
+const_pred = rep(mean(y[w==1]) - mean(y[w==0]), n)           # naive confounded ATE (for full sample)
 
 cat("\n=== NORMALISED MSE ===\n")
 cat("(< 1.0 means better than predicting mean tau for everyone)\n\n")
 
-for (name in c("rlasso", "rboost", "zero_pred")) {
-  est      = switch(name, rlasso=rlasso_est, rboost=rboost_est, zero_pred=zero_pred)
+for (name in c("rlasso", "rboost", "zero_pred", "const_pred")) {
+  est      = switch(name, rlasso=rlasso_est, rboost=rboost_est, zero_pred=zero_pred, const_pred=const_pred)
   raw_mse  = mean((est - tau_x)^2)
   norm_mse = raw_mse / tau_variance
   quality  = ifelse(norm_mse < 0.25, "EXCELLENT",
