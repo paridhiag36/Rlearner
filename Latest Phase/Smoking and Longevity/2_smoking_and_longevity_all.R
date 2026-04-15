@@ -447,7 +447,7 @@ summary_df$sg1_n         = sum(sg1)
 summary_df$sg2_n         = sum(sg2)
 summary_df$sg3_n         = sum(sg3)
 
-csv_path = file.path(output_dir, paste0("smoking_all_", n, ".csv"))
+csv_path = file.path(output_dir, paste0("2_smoking_all_", n, ".csv"))
 write.csv(summary_df, csv_path, row.names = FALSE)
 cat("\nResults saved to:", csv_path, "\n")
 
@@ -455,7 +455,7 @@ cat("\nResults saved to:", csv_path, "\n")
 # SECTION 12: ONE PLOT — Propensity histogram
 # ============================================================
 
-png(file.path(output_dir, paste0("propensity_hist_all_", n, ".png")), 
+png(file.path(output_dir, paste0("2_propensity_hist_all_", n, ".png")), 
     width = 800, height = 500, res = 120)
 hist(propensity[w == 0], breaks = 20,
      col  = rgb(0.2, 0.4, 0.8, 0.5),
@@ -472,7 +472,7 @@ legend("topright",
        fill = c(rgb(0.2, 0.4, 0.8, 0.5), rgb(0.9, 0.2, 0.2, 0.5)),
        cex = 0.8)
 dev.off()
-cat("Plot saved to:", file.path(output_dir, paste0("propensity_hist_n", n, ".png")), "\n")
+cat("Plot saved to:", file.path(output_dir, paste0("2_propensity_hist_n", n, ".png")), "\n")
 
 # ============================================================
 # RESULTS ANALYSIS n=300, seed=42, all
