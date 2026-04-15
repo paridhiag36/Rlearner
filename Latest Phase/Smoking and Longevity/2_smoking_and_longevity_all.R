@@ -332,7 +332,8 @@ learners_all = list(
   slasso = slasso_est, sboost = sboost_est, skern  = skern_est,
   tlasso = tlasso_est, tboost = tboost_est, tkern  = tkern_est,
   xlasso = xlasso_est, xboost = xboost_est, xkern  = xkern_est,
-  zero_pred = rep(mean(tau_test), n_test),   # baseline: predict mean tau
+  zero_pred  = rep(0, n_test),
+  const_pred = rep(mean(y_train[w_train==1]) - mean(y_train[w_train==0]), n_test),
   ols_inter = as.numeric(ols_tau_est)
 )
 
@@ -425,7 +426,7 @@ for (i in seq_len(nrow(summary_df))) {
 }
 
 cat("\nNote: NormMSE < 1.0 = better than predicting mean tau for everyone\n")
-cat("      zero_pred (NormMSE = 1.000) is the baseline reference\n")
+cat("      zero_pred is the baseline reference\n")
 cat("      SG3 inflated (rec > 1.1) = learner confusing confounding with causal effect\n")
 
 # ============================================================
@@ -478,23 +479,65 @@ cat("Plot saved to:", file.path(output_dir, paste0("propensity_hist_n", n, ".png
 # ============================================================
 # Setup: 15 treated in training (5.8%) — extreme imbalance
 # True ATE=3.21 | tau SD=2.27
-# True tau: SG1=0.635 (resilient), SG2=6.50 (vulnerable), SG3=4.33 (confounding)
+# True tau: SG1=0.635 (resilient), SG2=6.504 (vulnerable), SG3=4.332 (confounding)
 # tkern and xkern FAILED (crashed — insufficient treated observations)
 
 # KEY FINDINGS:
-# Best learners: rkern (0.423) and xlasso (0.473) — both below 1.0, beating mean prediction despite only 15 treated. rkern rank_corr=0.809, xlasso=0.827 (both reliable). However rkern produces negative SG1 estimates — good overall ranking but unreliable in the tails where data is sparse.
+# Best learners: rkern (0.423) and xlasso (0.473) — both below 1.0, beating zero_pred (3.542) despite only 15 treated. rkern rank_corr=0.809, xlasso=0.827 (both reliable). However both produce negative SG1 estimates (rkern: -0.143, xlasso: -0.234) — good overall ranking but clinically impossible and unreliable in the tails.
 # rlasso (0.732, rank=0.674): functional but weaker than rkern/xlasso. Correct ordering (SG2>SG3>SG1). No SG3 inflation — R-learner's propensity residualisation successfully avoids the confounding trap.
-# rboost (1.015): just above baseline, rank=-0.399 (anti-correlated). Collapsed near-constant — no heterogeneity recovered.
-# tboost (52.3): catastrophic failure. norm_mse=52, rank=-0.888, SG2 estimated at -14 (sign wrong). T-learner's treated arm model has 15 observations — boosting overfits completely.
-# sboost (9.49) and xboost (4.15): also badly degraded. Boosting-based methods universally fail at this imbalance level.
-# SG1 recovery: unreliable across all learners (true_sg1=0.635, still near the pmax(0.5) floor despite relaxing age threshold to <60 — small estimation errors are amplified when dividing by a near-floor value. SG1 n=9 in test set.
-# Notable: rkern and skern produce NEGATIVE SG1 estimates (-0.143 and -8.086) which is clinically impossible — smoking always harms. This reflects the instability of these methods with only 15 treated training observations.
-# SG3: no learner inflates (sg3_inflated=FALSE for all non-failed). Confounding trap not triggered at n=300 — learners attenuate rather than inflate under extreme imbalance.
+# slasso (0.855, rank=0.702): competitive with rlasso, also correct ordering. SG1 rec=1.114— the only learner to slightly overestimate SG1, though still near-floor.
+# ols_inter (0.909, rank=0.741): surprisingly competitive as a linear baseline. Correct ordering. Negative SG1 estimate (-0.673) — linear interactions struggle near the floor.
+# rboost (1.015): just above zero_pred baseline, rank=-0.399 (anti-correlated). Collapsed near-constant — no heterogeneity recovered.
+# tlasso (1.404, rank=0.540): above baseline, correct ordering but substantially attenuated.
+# skern (3.915, rank=0.907): paradox — highest rank correlation of all learners but catastrophic NormMSE. SG1 estimate of -8.086 is wildly wrong, dragging up MSE despite good relative ordering. Clinically impossible predictions.
+# xboost (4.153): badly degraded, rank=-0.817 (anti-correlated), SG3 estimate negative (-1.518) — sign wrong. Boosting on X-learner's pseudo-outcomes fails here.
+# sboost (9.487): also badly degraded, rank=-0.672, SG1 massively inflated (rec=17.7).
+#   Boosting-based methods universally fail at this imbalance level.
+
+# const_pred (45.841): confounded naive ATE of 17.593 applied to everyone — NormMSE >> 1 and SG3 inflated (rec=4.061), confirming the confounding trap a naive estimator falls into. Useful contrast: demonstrates what propensity residualisation is protecting against.
+# tboost (52.269): catastrophic failure. rank=-0.888, SG2 estimated at -14.0 (sign wrong). T-learner's treated arm model has 15 observations — boosting overfits completely.
+
+# SG1 recovery: unreliable across all learners (true_sg1=0.635, near the pmax(0.5) floor). Small estimation errors amplified when dividing by ~0.635. SG1 n=9 in test set. rkern, xlasso, ols_inter all produce negative estimates — clinically impossible.
+# SG3: no meta-learner inflates (sg3_inflated=FALSE for all non-failed meta-learners). Confounding trap not triggered — learners attenuate rather than inflate under extreme imbalance. const_pred confirms the trap is real: naive estimator gives rec=4.061.
 # Propensity plot: bimodal distribution — most patients cluster near 0.01-0.03 (very unlikely to smoke), with a second cluster at the 0.20 cap for highest-risk patients. Treated patients (red) concentrated at the cap. Visually confirms extreme imbalance.
 
 # CONCLUSION: At n=300 (15 treated in training, 9 SG1 / 5 SG2 / 9 SG3 in test),
-#   kern and lasso variants show surprising resilience with rkern and xlasso both beating the mean baseline. Boosting fails universally. 
-#   SG1 recovery remains unreliable due to floor proximity. 
-#   No confounding inflation detected — all learners attenuate rather than inflate SG3 under extreme imbalance.
-#   Results motivate n=500 and n=1000 runs to test whether pattern holds.
+#   kern and lasso variants show surprising resilience — rkern and xlasso both beat the zero_pred floor (NormMSE 0.423 and 0.473 vs 3.542). Boosting fails universally.
+#   skern's rank_corr=0.907 is misleading: extreme SG1 predictions inflate MSE despite good relative ordering — rank correlation alone is insufficient to assess learner quality.
+#   No confounding inflation detected in any meta-learner — all attenuate rather than inflate SG3 under extreme imbalance. const_pred (45.8) shows what a naive estimator does: massively overestimates tau everywhere due to confounding, confirming the R-learner's propensity residualisation is doing real work.
+#   Results motivate n=500 run to test whether rkern/xlasso resilience holds with more data.
+# ============================================================
+# RESULTS ANALYSIS n=500, seed=42, all learners
+# ============================================================
+# Setup: 24 treated in training (4.8%) — extreme imbalance
+# True ATE=3.20 | tau SD=2.24
+# True tau: SG1=0.575 (resilient), SG2=6.940 (vulnerable), SG3=5.348 (confounding)
+# SG sizes (test set): SG1=14, SG2=7, SG3=12
+# All learners returned estimates (no crashes at n=500)
+
+# KEY FINDINGS:
+# Best learners: xkern (0.526) and rkern (0.608) — both beat zero_pred (3.405). xkern rank_corr=0.719, rkern rank_corr=0.689 (both moderate-reliable). All SG1 estimates positive this time — floor instability reduced vs n=300. Both recover correct ordering (SG2>SG3>SG1). No SG3 inflation.
+# rboost (0.734, rank=0.693): strong recovery vs n=300 where it collapsed to constant (1.015, rank=-0.399). Now beats zero_pred with correct ordering — going from 23 to 24 treated in training appears to have unlocked meaningful signal for rboost.
+# tkern (0.936) and skern (0.948): both just below 1.0, correct ordering, no SG3 inflation. Consistent with kern variants showing resilience under imbalance.
+# xlasso (1.002): right at the zero_pred boundary — marginal. rank_corr=0.693, correct ordering. At n=300 xlasso was the second-best learner (0.473); it degrades at n=500 despite more data, likely due to different random split and fewer test treated (5 vs 8).
+# rlasso (1.475, rank=0.232): sharp degradation vs n=300 (0.732, rank=0.674). Incorrect ordering (FALSE). Sensitive to this particular split — with only 5 treated in test, single-seed results are noisy for rlasso.
+# slasso (1.500, rank=0.613): above baseline but correct ordering. SG2 slightly overestimated (rec=1.117) — not inflated by threshold but worth monitoring.
+# ols_inter (1.545, rank=0.676): above baseline, correct ordering. SG2 overestimated (rec=1.204) — linear interactions overfit with few treated observations.
+# tlasso (2.175): worse than zero_pred, rank=0.530. T-learner with lasso struggles more at n=500 than n=300 — again likely split-dependent with only 5 test treated.
+# sboost (6.750): badly degraded, rank=-0.433, incorrect ordering.
+# tboost (12.997): catastrophic failure, rank=-0.531, SG2 rec=0.151 (massive underestimate). Boosting methods universally fail — consistent with n=300.
+# xboost (20.622): worst non-const learner, rank=-0.904, SG3 inflated (rec=1.749) — the only meta-learner to fall into the confounding trap. X-learner's pseudo-outcome construction amplifies noise catastrophically under boosting with extreme imbalance.
+# const_pred (47.277): confounded naive ATE of 17.934 applied to everyone. SG3 inflated (rec=3.354). Confirms the confounding trap is real and that meta-learners (except xboost) are successfully avoiding it.
+
+# SG1 recovery: more stable than n=300 — no negative estimates this time. But rec values still unreliable (range: 0 to 23.2), true_sg1=0.575 still near the pmax(0.5) floor.
+# SG3: only xboost inflates (rec=1.749). All other non-failed learners attenuate —propensity residualisation continues to protect against the confounding trap.
+# Propensity plot: same bimodal structure as n=300 — spike near 0.01-0.03, second cluster at the 0.20 cap. 29 treated total but only 24 in training (5 in test), confirming the finite-sample constraint remains binding.
+
+# CONCLUSION: At n=500 (24 treated in training, 14 SG1 / 7 SG2 / 12 SG3 in test),
+#   kern variants (xkern, rkern) lead again, consistent with n=300. rboost's recovery from collapse to 0.734 is the standout change. Boosting still fails universally.
+#   Single-seed results show high variance across learners (rlasso flips from 2nd to 7th)— conclusions from any one split are unreliable.
+
+# n=300 vs n=500 COMPARISON AND MOTIVATION FOR MULTI-ITERATION:
+#   The ranking of learners shifts substantially between n=300 and n=500 (xlasso drops from 2nd to 6th, rlasso from 3rd to 7th, rboost recovers from near-collapse) despite only 9 additional treated observations in training. 
+#   With 5-24 treated units, a single random split drives results as much as learner quality — multi-iteration averaging is essential to separate genuine signal from split-specific noise.
 # ============================================================
