@@ -139,6 +139,7 @@ run_one_iteration = function(iter_seed, n, n_train, n_test,
   # now means 2+ comorbidities
   # which is clinically still meaningful
   
+  #removed as same as sg2
   sg3 = x5_t > 65  &    # relaxed from 70 to 65
     x3_t < 3        # relaxed from 2 to 3
   
