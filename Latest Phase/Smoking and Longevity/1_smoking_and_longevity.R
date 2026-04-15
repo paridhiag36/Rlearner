@@ -339,7 +339,7 @@ for (name in c("rlasso", "rboost")) {
   results_df[[paste0(name, "_sg3_inflated")]] = e3/true_sg3 > 1.1
 }
 
-csv_path = file.path(output_dir, paste0("smoking(only rlasso and rboost)_", n, ".csv"))
+csv_path = file.path(output_dir, paste0("1_smoking_", n, ".csv"))
 write.csv(results_df, csv_path, row.names = FALSE)
 cat("\nResults saved to:", csv_path, "\n")
 
@@ -348,7 +348,7 @@ cat("\nResults saved to:", csv_path, "\n")
 # Shows visually how extreme the imbalance is
 # ============================================================
 
-plot_path = file.path(output_dir, paste0("propensity_hist_", n, ".png"))
+plot_path = file.path(output_dir, paste0("1_propensity_hist_", n, ".png"))
   png(plot_path, width = 800, height = 500, res = 120)
   
   hist(propensity[w == 0], breaks = 20,
