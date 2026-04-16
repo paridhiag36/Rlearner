@@ -5,13 +5,13 @@ Three simulation studies comparing R-, S-, T-, and X-learners (with lasso, boost
 
 ## Study overview
 
-Each case study is a self-contained simulation with a realistic clinical DGP, a pre-specified set of subgroups, and a common learner panel of 12 meta-learner × base-method combinations plus baselines (`ols_inter`, `zero_pred`, and — in the preventative study — a constant predictor).
+Each case study is a self-contained simulation with a realistic clinical DGP, a pre-specified set of subgroups, and a common learner panel of 12 meta-learner × base-method combinations plus baselines (`ols_inter`, `zero_pred`, and, in the preventative study, a constant predictor).
 
 | Case study | Core challenge | Treatment effect structure | Primary output |
 |---|---|---|---|
 | **Smoking and Longevity** | Severe treatment imbalance (~7.5% treated) | Heterogeneous τ(X), all non-negative | CSVs + propensity histograms |
-| **Preventative Healthcare (SMS)** | Genuine null effect — tests whether learners hallucinate heterogeneity | τ(X) = 0.01 for everyone | JSON + summary CSVs |
-| **Telemedicine** | Sign change in τ(X) — beneficial for some, harmful for others | ATE ≈ 0, σ(τ) large | JSON + long-format metrics + sign-recovery plot |
+| **Preventative Healthcare (SMS)** | Genuine null effect: tests whether learners hallucinate heterogeneity | τ(X) = 0.01 for everyone | JSON + summary CSVs |
+| **Telemedicine** | Sign change in τ(X): beneficial for some, harmful for others | ATE ≈ 0, σ(τ) large | JSON + long-format metrics + sign-recovery plot |
 
 ## Project structure
 
@@ -116,7 +116,7 @@ pip install pandas numpy scipy jupyter
 
 Each case study follows the same numbered-prefix convention. Run in order:
 
-- **`1_*.R`** — single-iteration exploratory run with 2 learners (`rlasso`, `rboost`). Quick sanity check on the DGP and produces one CSV + one propensity histogram.
+- **`1_*.R`** — single-iteration exploratory run with usually 2 learners (`rlasso`, `rboost`). Quick sanity check on the DGP and produces one CSV + one propensity histogram.
 - **`2_*.R`** — single-iteration run with the full learner panel (all 12 meta-learner × base-method combinations plus baselines).
 - **`3_*.R`** — multi-iteration parallel simulation. Uses `future::multisession` with `availableCores() - 1` workers. Produces the primary results used in downstream analysis.
 - **`4_*.R` / `.ipynb`** — post-processing: summary stats, DGP diagnostics, plot generation.
