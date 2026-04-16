@@ -3,7 +3,7 @@ library(jsonlite)
 library(tidyverse)
 
 # Read the JSON file
-json_data <- fromJSON("preventive_200results.json", simplifyVector = FALSE)
+json_data <- fromJSON("3_preventative_multi_iter_200iters.json", simplifyVector = FALSE)
 
 # ============================================================
 # 1. SUMMARY TABLE (Main results across all learners)
@@ -59,7 +59,7 @@ summary_df <- do.call(rbind, lapply(names(json_data$summary_by_learner), functio
 }))
 
 # Write to CSV
-write.csv(summary_df, "preventive_200results_summary_median_rmse.csv", row.names = FALSE)
+write.csv(summary_df, "3_preventative_multi_iter_summary_200iters.csv", row.names = FALSE)
 
 # ============================================================
 # 2. DETAILED PER-ITERATION RESULTS 

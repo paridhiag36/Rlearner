@@ -503,7 +503,7 @@ json_output = list(
   iterations = all_iterations
 )
 
-json_path = "preventive_results.json"
+json_path = "3_preventative_multi_iter_100iters.json"
 write(toJSON(json_output, auto_unbox = TRUE), json_path)
 cat("Results written to:", json_path, "\n")
 cat("File size:", round(file.size(json_path) / 1024^2, 2), "MB\n")
