@@ -191,5 +191,5 @@ summarise_vec(results$pct_near_boundary, "pct_near_boundary")
 # EXPORT
 # ============================================================
 
-write.csv(results, "dgp_iter_diagnostics.csv", row.names = FALSE)
-cat("\nPer-iteration results written to: dgp_iter_diagnostics.csv\n")
+write.csv(results, "4_telemed_dgp_iter_diagnostics.csv", row.names = FALSE)
+cat("\nPer-iteration results written to: 4_telemed_dgp_iter_diagnostics.csv\n")

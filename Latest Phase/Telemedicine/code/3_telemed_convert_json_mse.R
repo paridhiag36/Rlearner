@@ -50,7 +50,7 @@ convert_json <- function(path) {
 
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))  # set to script dir
 
-convert_json("telemed_simulation_100.json")
-convert_json("telemed_simulation_200.json")
+convert_json("3_telemed_multi_iter_n300_100iters.json")
+convert_json("3_telemed_multi_iter_n300_200iters.json")
 
 cat("\nConversion complete. Re-run json_analysis.R to regenerate the CSV.\n")

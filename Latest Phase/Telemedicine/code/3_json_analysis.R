@@ -12,8 +12,8 @@
 #   2. DGP variables (optional, for SNR) — see DGP SECTION below
 #
 # OUTPUT
-#   telemed_metrics_long.csv  — one row per learner per metric
-#   telemed_dgp_summary.csv   — DGP-level diagnostics (one row)
+#   3_telemed_multi_iter_metrics_long.csv  — one row per learner per metric
+#   3_telemed_multi_iter_dgp_summary.csv   — DGP-level diagnostics (one row)
 # ============================================================
 
 library(jsonlite)
@@ -25,9 +25,9 @@ library(MASS)
 # CONFIGURATION
 # ============================================================
 
-JSON_PATH   <- "telemed_simulation_200.json"   # path to your JSON file
-OUTPUT_LONG <- "telemed_metrics_long.csv"
-OUTPUT_DGP  <- "telemed_dgp_summary.csv"
+JSON_PATH   <- "3_telemed_multi_iter_n300_200iter.json"   # path to your JSON file
+OUTPUT_LONG <- "3_telemed_multi_iter_metrics_long.csv"
+OUTPUT_DGP  <- "3_telemed_multi_iter_dgp_summary.csv"
 
 LEARNERS <- c("rlasso","rboost","rkern",
               "slasso","sboost","skern",

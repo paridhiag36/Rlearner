@@ -8,11 +8,11 @@ library(scales)
 # LOAD DATA
 # ============================================================
 
-dgp_diag   <- read.csv("dgp_iter_diagnostics.csv")
-dgp_summ   <- read.csv("telemed_dgp_summary.csv")
-metrics    <- read.csv("telemed_metrics_long.csv")
-table_data <- read.csv("telemed_table_ready.csv")
-sim        <- fromJSON("telemed_simulation_200.json")
+dgp_diag   <- read.csv("4_telemed_dgp_iter_diagnostics.csv")
+dgp_summ   <- read.csv("3_telemed_multi_iter_dgp_summary.csv")
+metrics    <- read.csv("3_telemed_multi_iter_metrics_long.csv")
+table_data <- read.csv("3_telemed_table_ready.csv")
+sim        <- fromJSON("3_telemed_multi_iter_n300_200iters.json")
 
 # ============================================================
 # PLOT 6: SIGN RECOVERY RATES — SG1 vs SG2 (dot plot)
@@ -115,7 +115,7 @@ p_sign <- ggplot(sign_long,
     axis.text.x        = element_text(size = 9)
   )
 
-ggsave("sign_recovery_plot.png", p_sign,
+ggsave("3_sign_recovery_plot.png", p_sign,
        width = 8, height = 5.5, units = "in", dpi = 300)
 
 cat("Sign recovery plot saved.\n")

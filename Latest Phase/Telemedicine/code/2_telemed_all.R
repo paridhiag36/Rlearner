@@ -798,7 +798,7 @@ results_json = list(
 )
 
 # Write to file
-json_path = "telemed_results.json"
+json_path = "2_telemed_all_250.json"
 write(toJSON(results_json), json_path)
 cat("Results exported to:", json_path, "\n")
 
